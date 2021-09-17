@@ -262,7 +262,7 @@ bitset<64> encrypt(bitset<64> &pt, bitset<64> &key64) {
     return applyIIP(cipher);
 }
 
-string bit_seq(string str) {
+string str_to_bitseq(string str) {
     string seq = "";
     for(int i=0; i<str.size(); ++i) {
         for(int j=7; j>=0; --j)
@@ -271,42 +271,48 @@ string bit_seq(string str) {
     return seq;
 }
 
-vector<bitset<64>> string_to_bits(string plain_text) {
+string bitseq_to_str(string bit_seq) {
+    string out = "";
+    for(int i=0; i<bit_seq.size(); i+=8) {
+        char c = 0x00;
+        for(int j=0; j<8; ++j) {
+            if(i+j < bit_seq.size() && bit_seq[i+j] == '1') 
+                _set(c, 7-j);
+        }
+        out += c;
+    }
+    return out;
+}
+
+vector<bitset<64>> string_to_bitset(string plain_text) {
     vector<bitset<64>> vec;
     for(int i=0; i<plain_text.size(); i+=8) {
         string sub = plain_text.substr(i, 8);
         if(sub.length() < 8) sub.append(8 - sub.length(), ' ');
-        vec.push_back(bitset<64>(bit_seq(sub)));
+        vec.push_back(bitset<64>(str_to_bitseq(sub)));
     }
     return vec;
 }
 
-string bits_to_string(vector<bitset<64>> &vec) {
+string bitset_to_string(vector<bitset<64>> &vec) {
     string out = "";
     for(auto &bs : vec) {
-        string st = "";
-        for(int i=7; i>=0; --i) {
-            char c = 0x00;
-            for(int j=0; j<8; ++j) {
-                if(bs.test(8*i+j)) _set(c, j);
-            }
-            st += c;
-        }
-        out += st;
+        out += bitseq_to_str(bs.to_string());
     }
     return out;
 }
 
 int main() {
-    bitset<64> key(bit_seq("ABCDEF12"));
-    vector<bitset<64>> vec = string_to_bits("ABCDEFGH12345678");
+    bitset<64> key(str_to_bitseq("ABCDEF12"));
+    vector<bitset<64>> vec = string_to_bitset("ABCDEFGH12345678344");
     for(auto &bs : vec)
         cout<<bs<<" ";
     cout<<"\n";
+    cout<<bitset_to_string(vec);
 
     vector<bitset<64>> vec_enc;
     for(auto &bs : vec)
         vec_enc.push_back(encrypt(bs, key));
     
-    cout<<bits_to_string(vec_enc)<<"\n";
+    cout<<bitset_to_string(vec_enc)<<"\n";
 }
