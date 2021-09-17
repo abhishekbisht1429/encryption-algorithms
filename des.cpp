@@ -127,15 +127,18 @@ bitset<32> sbox(bitset<48> &inp) {
         s2 = 0x00;
         si = i/6;
         /* set s1 */
-        if(inp.test(i)) _set(s1, 0);
-        if(inp.test(i+5)) _set(s2, 1);
+        if(inp.test(i)) _set(s1, 1);
+        if(inp.test(i+5)) _set(s2, 0);
 
         /* set s2 */
         for(int j=1; j<=4; ++j)
-            if(inp.test(i+j)) _set(s2, j-1);
+            if(inp.test(i+j)) _set(s2, 4-j);
         
-        for(int j=0; j<4; ++j)
-            if(_isSet(sb[si][s1][s2], 3-j)) out.set(k++);
+        for(int j=0; j<4; ++j) {
+            if(_isSet(sb[si][s1][s2], 3-j)) 
+                out.set(k);
+            ++k;
+        }
     }
 
     return out;
@@ -161,9 +164,9 @@ bitset<56> applyKP(bitset<64> &key64) {
 
 bitset<48> applyKP2(bitset<56> &key56) {
     bitset<48> round_key;
-    for(int j=0; j<48; ++j) {
-        if(key56.test(kp2[j]-1)) round_key.set(j);
-        else round_key.reset(j);
+    for(int i=0; i<48; ++i) {
+        if(key56.test(kp2[i]-1)) round_key.set(i);
+        else round_key.reset(i);
     }
     return round_key;
 }
@@ -195,49 +198,53 @@ bitset<64> applyIIP(bitset<64> &cipher) {
     return perm;
 }
 
-bitset<64> encrypt(bitset<64> &pt, bitset<64> &key64) {
-    /* Initial permutation on plain text */
-    bitset<64> cipher = applyIP(pt);
+/*
+    * a non zero type value encrypts
+    * a zero type value decrypts
+*/
+bitset<64> transform(bitset<64> &pt, bitset<64> &key64, int type = 1) {
 
     /* permuted choice 1 on key64 to obtain 56 bit key */
     bitset<56> key56 = applyKP(key64);
-
     /* divide the cipher and key56 into two parts */
-    bitset<32> lcipher, rcipher;
     bitset<28> lkey, rkey;
-    for(int i=0; i<32; ++i) {
-        lcipher[i] = cipher[i];
-        rcipher[i] = cipher[i+32];
-    }
     for(int i=0; i<28; ++i) {
-        lkey[i] = pt[i];
-        rkey[i] = pt[i+28];
+        lkey[i] = key64[i];
+        rkey[i] = key64[i+28];
     }
-
-    /* Start the rounds */
-    /* Create bitset for round key64 of 48 bits */
-    bitset<48> round_key;
-    /* Create array for expanded rcipher of pt of 48 bits */
-    bitset<48> expn_rcipher;
-    /* intermediate res */
-    bitset<32> res;
+    /* Computer the round keys */
+    vector<bitset<48>> round_keys(16);
     for(int i=0; i<16; ++i) {
         /* circular left shift keys - lkey */
         rotl(lkey, shift[i]);
         rotl(rkey, shift[i]);
-        for(int j=0; j<28; ++j)
-            key56[i] = lkey[i];
-        for(int j=28; j<56; ++j)
-            key56[j] = rkey[j-28];
-
+        for(int j=0; j<28; ++j) {
+            key56[j] = lkey[j];
+            key56[j+28] = rkey[j];
+        }
         /* Permuted choice 2 on key56 to get round subkey (56 to 48 bits) */
-        round_key = applyKP2(key56);
+        round_keys[i] = applyKP2(key56);
+    }
 
+    /* Initial permutation on plain text */
+    bitset<64> cipher = applyIP(pt);
+    /* divide the input into two parts */
+    bitset<32> lcipher, rcipher;
+    for(int i=0; i<32; ++i) {
+        lcipher[i] = cipher[i];
+        rcipher[i] = cipher[i+32];
+    }
+    /* Create array for expanded rcipher of pt of 48 bits */
+    bitset<48> expn_rcipher;
+    /* intermediate res */
+    bitset<32> res;
+    /* Start the rounds */
+    for(int i=0; i<16; ++i) {
         /* Expansion of rcipher (32 to 48 bits) */
         expn_rcipher = applyEP(rcipher);
 
         /* xor with computed round key64 (48 bits)*/
-        expn_rcipher ^= round_key;
+        expn_rcipher ^= round_keys[type?i:(15-i)];
 
         /* sbox (48 to 32 bits)*/
         res = sbox(expn_rcipher);
@@ -253,10 +260,10 @@ bitset<64> encrypt(bitset<64> &pt, bitset<64> &key64) {
         rcipher = res;
     }
     /* combine lcipher and rcipher with their position interchanged*/
-    for(int i=0; i<32; ++i)
+    for(int i=0; i<32; ++i) {
         cipher[i] = rcipher[i];
-    for(int i=32; i<64; ++i)
-        cipher[i] = lcipher[i-32];
+        cipher[i+32] = lcipher[i];
+    }
 
     /* apply inverse permutation on pt */
     return applyIIP(cipher);
@@ -304,15 +311,19 @@ string bitset_to_string(vector<bitset<64>> &vec) {
 
 int main() {
     bitset<64> key(str_to_bitseq("ABCDEF12"));
-    vector<bitset<64>> vec = string_to_bitset("ABCDEFGH12345678344");
-    for(auto &bs : vec)
-        cout<<bs<<" ";
-    cout<<"\n";
-    cout<<bitset_to_string(vec);
+    vector<bitset<64>> vec = string_to_bitset("Hello I am Abhishek!");
+    // for(auto &bs : vec)
+    //     cout<<bs<<" ";
+    // cout<<"\n";
+    cout<<bitset_to_string(vec)<<"\n";
 
     vector<bitset<64>> vec_enc;
     for(auto &bs : vec)
-        vec_enc.push_back(encrypt(bs, key));
-    
+        vec_enc.push_back(transform(bs, key));
     cout<<bitset_to_string(vec_enc)<<"\n";
+
+    vector<bitset<64>> vec_dec;
+    for(auto &bs : vec_enc)
+        vec_dec.push_back(transform(bs, key, 0));
+    cout<<bitset_to_string(vec_dec)<<"\n";
 }
