@@ -216,8 +216,8 @@ bitset<64> transform(bitset<64> &pt, bitset<64> &key64, int type = 1) {
     vector<bitset<48>> round_keys(16);
     for(int i=0; i<16; ++i) {
         /* circular left shift keys - lkey */
-        rotl(lkey, shift[i]);
-        rotl(rkey, shift[i]);
+        rotl<28>(lkey, shift[i]);
+        rotl<28>(rkey, shift[i]);
         for(int j=0; j<28; ++j) {
             key56[j] = lkey[j];
             key56[j+28] = rkey[j];
@@ -311,19 +311,16 @@ string bitset_to_string(vector<bitset<64>> &vec) {
 
 int main() {
     bitset<64> key(str_to_bitseq("ABCDEF12"));
-    vector<bitset<64>> vec = string_to_bitset("Hello I am Abhishek!");
-    // for(auto &bs : vec)
-    //     cout<<bs<<" ";
-    // cout<<"\n";
-    cout<<bitset_to_string(vec)<<"\n";
+    vector<bitset<64>> vec = string_to_bitset("Hello I am Abhishek! This text will be encrypted by 56 bit DEA algorithm");
+    cout<<"original  : "<<bitset_to_string(vec)<<"\n";
 
     vector<bitset<64>> vec_enc;
     for(auto &bs : vec)
         vec_enc.push_back(transform(bs, key));
-    cout<<bitset_to_string(vec_enc)<<"\n";
+    cout<<"encrypted : "<<bitset_to_string(vec_enc)<<"\n";
 
     vector<bitset<64>> vec_dec;
     for(auto &bs : vec_enc)
         vec_dec.push_back(transform(bs, key, 0));
-    cout<<bitset_to_string(vec_dec)<<"\n";
+    cout<<"decrypted : "<<bitset_to_string(vec_dec)<<"\n";
 }
